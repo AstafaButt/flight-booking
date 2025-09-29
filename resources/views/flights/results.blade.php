@@ -11,6 +11,8 @@
         .flight-card { transition: transform .25s ease, box-shadow .25s ease; }
         .flight-card:hover { transform: translateY(-6px); box-shadow: 0 14px 30px rgba(0,0,0,.08); }
         .active-trip { background-color: #2563eb !important; color: white !important; }
+        .details-panel { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .details-panel.open { max-height: 500px; }
     </style>
 </head>
 
@@ -89,14 +91,15 @@
             @foreach($flights['data'] as $index => $flight)
                 @php
                     // derive first/last segments and times
-                     $firstSegment = $flight['itineraries'][0]['segments'][0];
-    $departureTime = \Carbon\Carbon::parse($firstSegment['departure']['at']);
-    $arrivalTime = \Carbon\Carbon::parse(end($flight['itineraries'][0]['segments'])['arrival']['at']);
+                    $firstSegment = $flight['itineraries'][0]['segments'][0];
+                    $departureTime = \Carbon\Carbon::parse($firstSegment['departure']['at']);
+                    $arrivalTime = \Carbon\Carbon::parse(end($flight['itineraries'][0]['segments'])['arrival']['at']);
                     $itinerarySegments = $flight['itineraries'][0]['segments'];
                     $lastSegment = end($itinerarySegments);
                    
                     $stops = count($itinerarySegments) - 1;
                     $itinerariesCount = count($flight['itineraries']);
+                    
                     // parse ISO 8601 duration PT#H#M#S -> minutes
                     $iso = $flight['itineraries'][0]['duration'] ?? '';
                     preg_match('/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/', $iso, $m);
@@ -104,6 +107,71 @@
                     $mins = isset($m[2]) ? (int)$m[2] : 0;
                     $secs = isset($m[3]) ? (int)$m[3] : 0;
                     $durationMinutes = $hours * 60 + $mins + (int)ceil($secs / 60);
+
+                    // Extract additional flight details
+                    $airlineCode = $firstSegment['carrierCode'] ?? 'Unknown';
+                    $flightNumber = $firstSegment['number'] ?? 'N/A';
+                    $aircraftCode = $firstSegment['aircraft']['code'] ?? 'Unknown';
+                    
+                    // Map aircraft codes to actual model names (you can expand this)
+                    $aircraftModels = [
+                        '320' => 'Airbus A320',
+                        '321' => 'Airbus A321',
+                        '319' => 'Airbus A319',
+                        '738' => 'Boeing 737-800',
+                        '73H' => 'Boeing 737-800',
+                        '73J' => 'Boeing 737-900',
+                        '77W' => 'Boeing 777-300ER',
+                        '788' => 'Boeing 787-8 Dreamliner',
+                        '789' => 'Boeing 787-9 Dreamliner',
+                        '333' => 'Airbus A330-300',
+                        '359' => 'Airbus A350-900',
+                        '321' => 'Airbus A321neo',
+                        // Add more mappings as needed
+                    ];
+                    
+                    $aircraftModel = $aircraftModels[$aircraftCode] ?? $aircraftCode;
+                    
+                    // Baggage information (you might need to adjust based on your API response)
+                    $baggageAllowance = '20 kg'; // Default
+                    if (isset($flight['travelerPricings'][0]['fareDetailsBySegment'][0]['includedCheckedBags'])) {
+                        $baggage = $flight['travelerPricings'][0]['fareDetailsBySegment'][0]['includedCheckedBags'];
+                        $baggageAllowance = ($baggage['weight'] ?? 20) . ' ' . ($baggage['weightUnit'] ?? 'kg');
+                    }
+                    
+                    $cabinClass = $flight['travelerPricings'][0]['fareDetailsBySegment'][0]['cabin'] ?? 'ECONOMY';
+                    $cabinClassFormatted = ucfirst(strtolower($cabinClass));
+                    
+                    // Map airline codes to names (you can expand this)
+                    $airlineNames = [
+                        'AI' => 'Air India',
+                        '6E' => 'IndiGo',
+                        'SG' => 'SpiceJet',
+                        'UK' => 'Vistara',
+                        'G8' => 'Go First',
+                        'AK' => 'AirAsia',
+                        'EY' => 'Etihad Airways',
+                        'EK' => 'Emirates',
+                        'QR' => 'Qatar Airways',
+                        'SQ' => 'Singapore Airlines',
+                        // Add more mappings as needed
+                    ];
+                    
+                    $airlineName = $airlineNames[$airlineCode] ?? $airlineCode;
+                    
+                    // Calculate layover times for multi-stop flights
+                    $layovers = [];
+                    if ($stops > 0) {
+                        for ($i = 0; $i < count($itinerarySegments) - 1; $i++) {
+                            $currentArrival = \Carbon\Carbon::parse($itinerarySegments[$i]['arrival']['at']);
+                            $nextDeparture = \Carbon\Carbon::parse($itinerarySegments[$i + 1]['departure']['at']);
+                            $layoverMinutes = $currentArrival->diffInMinutes($nextDeparture);
+                            $layovers[] = [
+                                'airport' => $itinerarySegments[$i]['arrival']['iataCode'],
+                                'duration' => $layoverMinutes
+                            ];
+                        }
+                    }
                 @endphp
                 
 
@@ -120,35 +188,174 @@
                 >
                     @csrf
                     <input type="hidden" name="flight" value="{{ e(json_encode($flight)) }}">
-                    <div class="p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center">
-                        <div class="flex-1 mb-4 lg:mb-0 flex items-center gap-4">
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-gray-800">{{ $departureTime->format('H:i') }}</div>
-                                <div class="text-sm text-gray-600">{{ $firstSegment['departure']['iataCode'] }}</div>
+                    
+                    <!-- Main Flight Info -->
+                    <div class="p-6">
+                        <!-- Airline and Flight Number -->
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">{{ $airlineName }}</h3>
+                                <p class="text-sm text-gray-600">Flight {{ $airlineCode }}{{ $flightNumber }} • {{ $aircraftModel }}</p>
                             </div>
-
-                            <div class="flex-1 text-center">
-                                <div class="text-gray-600 text-sm">
-                                    {{ substr($iso, 2) ?: 'N/A' }} • {{ $stops === 0 ? 'Non-stop' : $stops . ' stop' . ($stops > 1 ? 's' : '') }}
-                                </div>
-                                <div class="h-px bg-gray-300 my-2 relative">
-                                    <i class="fas fa-plane absolute left-1/2 transform -translate-x-1/2 -top-2 text-gray-400 bg-white px-1"></i>
-                                </div>
-                            </div>
-
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-gray-800">{{ $arrivalTime->format('H:i') }}</div>
-                                <div class="text-sm text-gray-600">{{ $lastSegment['arrival']['iataCode'] }}</div>
-                            </div>
+                            <button type="button" class="details-toggle text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                                <span class="mr-1">Flight details</span>
+                                <i class="fas fa-chevron-down text-xs"></i>
+                            </button>
                         </div>
 
-                        <div class="text-center lg:text-right">
-                            <div class="text-3xl font-bold text-blue-600 mb-2">
-                                {{ $flight['price']['total'] }} {{ $flight['price']['currency'] ?? 'INR' }}
+                        <!-- Route and Timing -->
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center">
+                            <div class="flex-1 mb-4 lg:mb-0 flex items-center gap-4">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-gray-800">{{ $departureTime->format('H:i') }}</div>
+                                    <div class="text-sm text-gray-600">{{ $departureTime->format('D, d M') }}</div>
+                                    <div class="text-sm font-medium text-gray-800">{{ $firstSegment['departure']['iataCode'] }}</div>
+                                </div>
+
+                                <div class="flex-1 text-center">
+                                    <div class="text-gray-600 text-sm">
+                                        {{ substr($iso, 2) ?: 'N/A' }} • {{ $stops === 0 ? 'Non-stop' : $stops . ' stop' . ($stops > 1 ? 's' : '') }}
+                                    </div>
+                                    <div class="h-px bg-gray-300 my-2 relative">
+                                        <i class="fas fa-plane absolute left-1/2 transform -translate-x-1/2 -top-2 text-gray-400 bg-white px-1"></i>
+                                    </div>
+                                    @if($stops > 0)
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        {{ $stops }} stop{{ $stops > 1 ? 's' : '' }}
+                                    </div>
+                                    @endif
+                                </div>
+
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-gray-800">{{ $arrivalTime->format('H:i') }}</div>
+                                    <div class="text-sm text-gray-600">{{ $arrivalTime->format('D, d M') }}</div>
+                                    <div class="text-sm font-medium text-gray-800">{{ $lastSegment['arrival']['iataCode'] }}</div>
+                                </div>
                             </div>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold">
-                                Select Flight <i class="fas fa-arrow-right ml-2"></i>
-                            </button>
+
+                            <div class="text-center lg:text-right">
+                                <div class="text-3xl font-bold text-blue-600 mb-2">
+                                    {{ $flight['price']['total'] }} {{ $flight['price']['currency'] ?? 'INR' }}
+                                </div>
+                                <div class="text-sm text-gray-600 mb-3">
+                                    {{ $cabinClassFormatted }} • {{ $baggageAllowance }} baggage
+                                </div>
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-300">
+                                    Select Flight <i class="fas fa-arrow-right ml-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expandable Details Panel -->
+                    <div class="details-panel bg-gray-50 border-t">
+                        <div class="p-6">
+                            <!-- Flight Segments -->
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-gray-800 mb-3">Flight Details</h4>
+                                @foreach($itinerarySegments as $segmentIndex => $segment)
+                                    @php
+                                        $segDeparture = \Carbon\Carbon::parse($segment['departure']['at']);
+                                        $segArrival = \Carbon\Carbon::parse($segment['arrival']['at']);
+                                        $segDuration = $segDeparture->diffInMinutes($segArrival);
+                                    @endphp
+                                    <div class="flex items-center py-3 {{ $segmentIndex > 0 ? 'border-t border-gray-200' : '' }}">
+                                        <div class="w-10 text-center">
+                                            <i class="fas fa-plane text-gray-400"></i>
+                                        </div>
+                                        <div class="flex-1 grid grid-cols-12 gap-4 items-center">
+                                            <div class="col-span-4">
+                                                <div class="font-medium text-gray-800">{{ $segDeparture->format('H:i') }}</div>
+                                                <div class="text-sm text-gray-600">{{ $segDeparture->format('d M') }}</div>
+                                                <div class="text-sm font-medium">{{ $segment['departure']['iataCode'] }}</div>
+                                            </div>
+                                            <div class="col-span-4 text-center">
+                                                <div class="text-sm text-gray-600">{{ floor($segDuration / 60) }}h {{ $segDuration % 60 }}m</div>
+                                                <div class="h-px bg-gray-300 my-1"></div>
+                                                <div class="text-xs text-gray-500">Flight {{ $segment['carrierCode'] }}{{ $segment['number'] }}</div>
+                                            </div>
+                                            <div class="col-span-4 text-right">
+                                                <div class="font-medium text-gray-800">{{ $segArrival->format('H:i') }}</div>
+                                                <div class="text-sm text-gray-600">{{ $segArrival->format('d M') }}</div>
+                                                <div class="text-sm font-medium">{{ $segment['arrival']['iataCode'] }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Layover information -->
+                                    @if($segmentIndex < count($itinerarySegments) - 1)
+                                        @php
+                                            $nextSegment = $itinerarySegments[$segmentIndex + 1];
+                                            $layoverArrival = \Carbon\Carbon::parse($segment['arrival']['at']);
+                                            $layoverDeparture = \Carbon\Carbon::parse($nextSegment['departure']['at']);
+                                            $layoverDuration = $layoverArrival->diffInMinutes($layoverDeparture);
+                                        @endphp
+                                        <div class="flex items-center py-2 bg-yellow-50 rounded mx-10 mb-2">
+                                            <div class="w-10 text-center">
+                                                <i class="fas fa-clock text-yellow-500 text-sm"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <div class="text-sm text-yellow-700">
+                                                    Layover at {{ $segment['arrival']['iataCode'] }}: {{ floor($layoverDuration / 60) }}h {{ $layoverDuration % 60 }}m
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+
+                            <!-- Additional Information -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <h5 class="font-semibold text-gray-700 mb-2">Baggage Information</h5>
+                                    <div class="space-y-1 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Checked Baggage:</span>
+                                            <span class="font-medium">{{ $baggageAllowance }} per person</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Cabin Baggage:</span>
+                                            <span class="font-medium">7 kg</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h5 class="font-semibold text-gray-700 mb-2">Flight Information</h5>
+                                    <div class="space-y-1 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Aircraft:</span>
+                                            <span class="font-medium">{{ $aircraftModel }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Class:</span>
+                                            <span class="font-medium">{{ $cabinClassFormatted }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Stops:</span>
+                                            <span class="font-medium">{{ $stops }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h5 class="font-semibold text-gray-700 mb-2">Fare Details</h5>
+                                    <div class="space-y-1 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Base Fare:</span>
+                                            <span class="font-medium">{{ $flight['price']['total'] }} {{ $flight['price']['currency'] ?? 'INR' }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Taxes & Fees:</span>
+                                            <span class="font-medium">Included</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Refundable:</span>
+                                            <span class="font-medium text-green-600">Yes</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -257,44 +464,69 @@
 
         // render visibleList first visibleCount items (move real nodes into container)
         function render() {
-    // clear container
-    container.innerHTML = '';
+            // clear container
+            container.innerHTML = '';
 
-    if (visibleList.length === 0) {
-        // show "no flights" message
-        container.innerHTML = `
-            <div class="text-center py-12 w-full">
-                <div class="bg-white rounded-xl shadow-sm p-8 max-w-md mx-auto">
-                    <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
-                    <h3 class="text-xl font-semibold text-gray-700 mb-2">No flights found</h3>
-                    <p class="text-gray-600 mb-6">Try adjusting your filters or search parameters.</p>
-                </div>
-            </div>
-        `;
-    } else {
-        // show filtered flights
-        visibleList.forEach((f, idx) => {
-            if (idx < visibleCount) {
-                f.node.style.display = '';
-                container.appendChild(f.node);
+            if (visibleList.length === 0) {
+                // show "no flights" message
+                container.innerHTML = `
+                    <div class="text-center py-12 w-full">
+                        <div class="bg-white rounded-xl shadow-sm p-8 max-w-md mx-auto">
+                            <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">No flights found</h3>
+                            <p class="text-gray-600 mb-6">Try adjusting your filters or search parameters.</p>
+                        </div>
+                    </div>
+                `;
             } else {
-                f.node.style.display = 'none';
-                container.appendChild(f.node);
+                // show filtered flights
+                visibleList.forEach((f, idx) => {
+                    if (idx < visibleCount) {
+                        f.node.style.display = '';
+                        container.appendChild(f.node);
+                    } else {
+                        f.node.style.display = 'none';
+                        container.appendChild(f.node);
+                    }
+                });
             }
-        });
-    }
 
-    // toggle load more button
-    const loadMoreBtn = document.getElementById('loadMoreBtn');
-    if (loadMoreBtn) {
-        if (visibleCount >= visibleList.length || visibleList.length === 0) {
-            loadMoreBtn.style.display = 'none';
-        } else {
-            loadMoreBtn.style.display = '';
+            // toggle load more button
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            if (loadMoreBtn) {
+                if (visibleCount >= visibleList.length || visibleList.length === 0) {
+                    loadMoreBtn.style.display = 'none';
+                } else {
+                    loadMoreBtn.style.display = '';
+                }
+            }
+
+            // Re-attach detail toggle event listeners
+            attachDetailToggleListeners();
         }
-    }
-}
 
+        // Toggle flight details
+        function attachDetailToggleListeners() {
+            document.querySelectorAll('.details-toggle').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    const flightCard = this.closest('.flight-item');
+                    const detailsPanel = flightCard.querySelector('.details-panel');
+                    const icon = this.querySelector('i');
+                    
+                    detailsPanel.classList.toggle('open');
+                    
+                    if (detailsPanel.classList.contains('open')) {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                        this.querySelector('span').textContent = 'Hide details';
+                    } else {
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                        this.querySelector('span').textContent = 'Flight details';
+                    }
+                });
+            });
+        }
 
         // event bindings
         document.getElementById('sortSelect')?.addEventListener('change', (e) => {
