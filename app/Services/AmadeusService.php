@@ -131,4 +131,31 @@ class AmadeusService
             return null;
         }
     }
+
+    public function searchCheapestDates(string $origin, string $destination, string $departureDate, string $returnDate = null): ?array
+{
+    try {
+        $token = $this->getAccessToken();
+        $endpoint = $this->baseUrl . "/v2/shopping/flight-offers";
+        
+        $query = [
+            'originLocationCode'      => $origin,
+            'destinationLocationCode' => $destination,
+            'departureDate'           => $departureDate, // format: YYYY-MM-DD
+            'adults'                  => 1,
+            'currencyCode'            => 'INR'
+        ];
+
+        if ($returnDate) {
+            $query['returnDate'] = $returnDate;
+        }
+
+        $response = Http::withToken($token)->get($endpoint, $query);
+        return $response->json();
+    } catch (\Exception $e) {
+        \Log::error("Amadeus cheapest date search failed: " . $e->getMessage());
+        return null;
+    }
+}
+
 }

@@ -83,6 +83,26 @@
         </div>
     </div>
     @endif
+@if(isset($cheapestFlights['data']) && count($cheapestFlights['data']) > 0)
+    <div class="container mx-auto px-4 py-6 bg-white rounded-lg shadow-md mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Cheapest Dates</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            @foreach($cheapestFlights['data'] as $offer)
+                @php
+                    $price = $offer['price']['total'] ?? 'N/A';
+                    $currency = $offer['price']['currency'] ?? 'USD';
+                    $depDate = $offer['itineraries'][0]['segments'][0]['departure']['at'] ?? '';
+                    $depDateFormatted = \Carbon\Carbon::parse($depDate)->format('D, d M');
+                @endphp
+
+                <div class="p-4 border rounded-lg bg-gray-50 hover:bg-blue-50 transition cursor-pointer">
+                    <div class="text-gray-600 text-sm">{{ $depDateFormatted }}</div>
+                    <div class="text-xl font-bold text-blue-600">{{ $price }} {{ $currency }}</div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+@endif
 
     <!-- Results container -->
     <div class="container mx-auto px-4 py-8">

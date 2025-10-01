@@ -130,4 +130,16 @@ class FlightController extends Controller
 
         return redirect()->route('payment.page');
     }
+    public function searchCheapest(Request $request)
+{
+    $origin = $request->input('origin');
+    $destination = $request->input('destination');
+    $departureDate = $request->input('departureDate');
+
+    $amadeus = new AmadeusService();
+    $results = $amadeus->searchCheapestDates($origin, $destination, $departureDate);
+
+    return view('results', ['cheapestFlights' => $results]);
+}
+
 }
