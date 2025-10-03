@@ -77,44 +77,54 @@ class PaymentController extends Controller
     /**
      * Handle successful payment (Stripe redirect)
      */
-    public function handleSuccess(Request $request)
-    {
-        $request->validate([
-            'payment_intent_id' => 'required',
-            'booking_id' => 'required|exists:bookings,id',
+    /**
+ * Handle successful payment (Stripe redirect)
+ */
+public function handleSuccess(Request $request)
+{
+    $request->validate([
+        'payment_intent_id' => 'required',
+        'booking_id' => 'required|exists:bookings,id',
+    ]);
+
+    try {
+        $booking = Booking::findOrFail($request->booking_id);
+
+        Stripe::setApiKey(config('services.stripe.secret'));
+        $paymentIntent = PaymentIntent::retrieve($request->payment_intent_id);
+
+        if ($paymentIntent->status !== 'succeeded') {
+            // If payment isn't succeeded yet, check if it requires action
+            if ($paymentIntent->status === 'requires_action') {
+                return redirect()->back()->with('error', 'Payment requires additional action.');
+            }
+            throw new \Exception('Payment not completed. Status: ' . $paymentIntent->status);
+        }
+
+        // Update booking status
+        $booking->update([
+            'status' => 'confirmed',
+            'stripe_payment_intent_id' => $paymentIntent->id,
+            'paid_at' => now(),
         ]);
 
-        try {
-            $booking = Booking::findOrFail($request->booking_id);
+        Log::info('Payment successful', [
+            'booking_id' => $booking->id,
+            'payment_intent_id' => $paymentIntent->id,
+        ]);
 
-            Stripe::setApiKey(config('services.stripe.secret'));
-            $paymentIntent = PaymentIntent::retrieve($request->payment_intent_id);
+        // Dispatch job for Amadeus booking
+        $this->bookFlightOnAmadeus($booking);
 
-            if ($paymentIntent->status !== 'succeeded') {
-                throw new \Exception('Payment not completed.');
-            }
+        return redirect()->route('booking.success', $booking->id)
+                         ->with('success', 'Payment completed and flight booking in progress!');
 
-            $booking->update([
-                'status' => 'confirmed',
-                'stripe_payment_intent_id' => $paymentIntent->id,
-                'paid_at' => now(),
-            ]);
-
-            Log::info('Payment successful', [
-                'booking_id' => $booking->id,
-                'payment_intent_id' => $paymentIntent->id,
-            ]);
-
-            $this->bookFlightOnAmadeus($booking);
-
-            return redirect()->route('booking.success', $booking->id)
-                             ->with('success', 'Payment completed and flight booked successfully!');
-        } catch (\Exception $e) {
-            Log::error('Payment or booking error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Payment verification or flight booking failed.');
-        }
+    } catch (\Exception $e) {
+        Log::error('Payment verification error: ' . $e->getMessage());
+        return redirect()->route('payment.show', $request->booking_id)
+                         ->with('error', 'Payment verification failed: ' . $e->getMessage());
     }
-
+}
     /**
      * Stripe Webhook handler
      */
