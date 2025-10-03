@@ -89,39 +89,55 @@
             <div class="max-w-4xl mx-auto">
                 <div class="search-card rounded-xl shadow-2xl p-6 md:p-8">
                     <form action="{{ route('flights.search') }}" method="GET" class="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-6">
-                        <div>
-                            <label for="origin" class="block text-gray-700 font-medium mb-2">From</label>
-                            <div class="relative">
-                                <i class="fas fa-plane-departure absolute left-3 top-3 text-blue-500"></i>
-                                <input type="text" name="origin" id="origin" placeholder="Origin (e.g. DEL)" 
-                                       class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label for="destination" class="block text-gray-700 font-medium mb-2">To</label>
-                            <div class="relative">
-                                <i class="fas fa-plane-arrival absolute left-3 top-3 text-blue-500"></i>
-                                <input type="text" name="destination" id="destination" placeholder="Destination (e.g. BOM)" 
-                                       class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                            </div>
-                        </div>
-                        
-                        <div class="md:col-span-2">
-                            <label for="date" class="block text-gray-700 font-medium mb-2">Departure Date</label>
-                            <div class="relative">
-                                <i class="fas fa-calendar-day absolute left-3 top-3 text-blue-500"></i>
-                                <input type="date" name="date" id="date" 
-                                       class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                            </div>
-                        </div>
-                        
-                        <div class="md:col-span-2">
-                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105">
-                                <i class="fas fa-search mr-2"></i>Search Flights
-                            </button>
-                        </div>
-                    </form>
+    <div>
+        <label for="origin" class="block text-gray-700 font-medium mb-2">From</label>
+        <div class="relative">
+            <i class="fas fa-plane-departure absolute left-3 top-3 text-blue-500"></i>
+            <input type="text" name="origin" id="origin" placeholder="Origin (e.g. DEL)" 
+                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+        </div>
+    </div>
+    
+    <div>
+        <label for="destination" class="block text-gray-700 font-medium mb-2">To</label>
+        <div class="relative">
+            <i class="fas fa-plane-arrival absolute left-3 top-3 text-blue-500"></i>
+            <input type="text" name="destination" id="destination" placeholder="Destination (e.g. BOM)" 
+                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+        </div>
+    </div>
+    
+    <div>
+        <label for="departure_date" class="block text-gray-700 font-medium mb-2">Departure Date</label>
+        <div class="relative">
+            <i class="fas fa-calendar-day absolute left-3 top-3 text-blue-500"></i>
+            <input type="date" name="departure_date" id="departure_date" 
+                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+        </div>
+    </div>
+    
+    <div>
+        <label for="return_date" class="block text-gray-700 font-medium mb-2">Return Date (optional)</label>
+        <div class="relative">
+            <i class="fas fa-calendar-check absolute left-3 top-3 text-blue-500"></i>
+            <input type="date" name="return_date" id="return_date" 
+                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+    </div>
+    
+    <div class="md:col-span-2">
+        <label for="adults" class="block text-gray-700 font-medium mb-2">Adults</label>
+        <input type="number" name="adults" id="adults" min="1" max="9" value="1"
+               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+    </div>
+    
+    <div class="md:col-span-2">
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105">
+            <i class="fas fa-search mr-2"></i>Search Flights
+        </button>
+    </div>
+</form>
+
                 </div>
             </div>
         </div>
