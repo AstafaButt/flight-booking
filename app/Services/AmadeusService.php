@@ -14,9 +14,9 @@ class AmadeusService
 
     public function __construct()
     {
-        $this->baseUrl = env('AMADEUS_BASE_URL');
-        $this->clientId = env('AMADEUS_CLIENT_ID');
-        $this->clientSecret = env('AMADEUS_CLIENT_SECRET');
+        $this->baseUrl = config('services.amadeus.base_url');
+        $this->clientId = config('services.amadeus.client_id');
+        $this->clientSecret = config('services.amadeus.client_secret');
     }
 
     /**

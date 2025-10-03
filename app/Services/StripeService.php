@@ -9,7 +9,7 @@ class StripeService
 {
     public function __construct()
     {
-        Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+        Stripe::setApiKey(config('services.stripe.secret'));
     }
 
     public function createPaymentIntent($amount, $currency = 'inr')

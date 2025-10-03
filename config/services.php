@@ -35,8 +35,16 @@ return [
         ],
     ],
     'stripe' => [
-    'key' => env('STRIPE_KEY'),
-    'secret' => env('STRIPE_SECRET'),
-],
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
+    'amadeus' => [
+    'base_url' => env('AMADEUS_BASE_URL'),
+    'client_id' => env('AMADEUS_CLIENT_ID'),
+    'client_secret' => env('AMADEUS_CLIENT_SECRET'),
+    ],
+
 
 ];
