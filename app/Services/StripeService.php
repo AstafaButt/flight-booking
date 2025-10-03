@@ -12,13 +12,15 @@ class StripeService
         Stripe::setApiKey(config('services.stripe.secret'));
     }
 
-    public function createPaymentIntent($amount, $currency = 'inr')
+    public function createPaymentIntent($amount, $currency = 'inr', $metadata = [], $description = null)
     {
         return PaymentIntent::create([
-            'amount' => $amount * 100, // convert to paisa
+            'amount'   => (int) ($amount * 100),
             'currency' => $currency,
             'payment_method_types' => ['card'],
-            'capture_method' => 'manual', // manual capture after ticketing
+            'capture_method'       => 'automatic',
+            'metadata'             => $metadata,
+            'description'          => $description,
         ]);
     }
 }

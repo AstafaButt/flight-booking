@@ -13,11 +13,13 @@ use App\Models\Booking;
 |--------------------------------------------------------------------------
 */
 
+// --------------------
 // Landing Page
+// --------------------
 Route::get('/', fn() => view('welcome'))->name('home');
 
 // --------------------
-// Public Flights
+// Flights
 // --------------------
 Route::prefix('flights')->name('flights.')->group(function () {
     Route::get('/', [FlightController::class, 'index'])->name('index');
@@ -27,35 +29,44 @@ Route::prefix('flights')->name('flights.')->group(function () {
     Route::get('/confirm', [FlightController::class, 'showConfirm'])->name('confirm.get');
     Route::post('/confirm', [FlightController::class, 'confirm'])->name('confirm.post');
 
-    // Book flight and redirect to payment
+    // Book flight → creates booking, then redirect to payment
     Route::post('/book', [BookingController::class, 'store'])->name('book');
 });
 
 // --------------------
-// Payment Routes
+// Payment
 // --------------------
 Route::prefix('payment')->name('payment.')->group(function () {
+    // Show payment page
     Route::get('/{booking}', [PaymentController::class, 'show'])->name('page');
+
+    // Create PaymentIntent (AJAX call)
     Route::post('/create-intent', [PaymentController::class, 'createIntent'])->name('create');
+
+    // Handle Stripe redirect success
     Route::post('/success', [PaymentController::class, 'handleSuccess'])->name('success');
-    Route::post('/webhook/stripe', [PaymentController::class, 'webhook'])->name('webhook');
+
+    // Stripe webhook (don’t protect with CSRF!)
+    Route::post('/webhook/stripe', [PaymentController::class, 'webhook'])
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])
+        ->name('webhook');
 });
 
 // --------------------
-// Booking Completion
+// Booking completion
 // --------------------
 Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::post('/{id}/complete', [BookingController::class, 'complete'])->name('complete');
 });
 
-// Booking success (optional)
+// Booking success page
 Route::get('/booking/success/{booking}', function ($bookingId) {
     $booking = Booking::findOrFail($bookingId);
     return view('booking.success', compact('booking'));
 })->name('booking.success');
 
 // --------------------
-// Admin Routes
+// Admin
 // --------------------
 Route::prefix('admin')->name('admin.')->group(function () {
 
@@ -75,7 +86,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->with('show_admin_modal', true);
     })->name('login');
 
-    // Admin Logoutss
+    // Admin Logout
     Route::post('/logout', function (Request $request) {
         $request->session()->forget('is_admin');
         $request->session()->invalidate();
@@ -101,14 +112,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         })->name('dashboard');
 
         // Booking Management
-        Route::get('/bookings', function () {
-            $bookings = Booking::latest()->get();
-            return view('admin.bookings', compact('bookings'));
-        })->name('bookings');
+        Route::get('/bookings', fn() => view('admin.bookings', ['bookings' => Booking::latest()->get()]))->name('bookings');
 
-        Route::get('/bookings/{booking}', function (Booking $booking) {
-            return view('admin.booking-details', compact('booking'));
-        })->name('booking.show');
+        Route::get('/bookings/{booking}', fn(Booking $booking) => view('admin.booking-details', compact('booking')))->name('booking.show');
 
         Route::post('/bookings/{booking}/confirm', function (Booking $booking) {
             $booking->update(['status' => 'confirmed']);
@@ -134,7 +140,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
                 $refund = \Stripe\Refund::create([
                     'payment_intent' => $booking->stripe_payment_intent_id,
-                    'amount' => $booking->amount * 100,
+                    'amount'         => $booking->amount * 100,
                 ]);
 
                 $booking->update([
