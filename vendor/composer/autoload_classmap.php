@@ -187,6 +187,7 @@ return array(
     'App\\Http\\Controllers\\PaymentController' => $baseDir . '/app/Http/Controllers/PaymentController.php',
     'App\\Http\\Middleware\\AdminAuth' => $baseDir . '/app/Http/Middleware/AdminAuth.php',
     'App\\Http\\Middleware\\NoBackButton' => $baseDir . '/app/Http/Middleware/NoBackButton.php',
+    'App\\Jobs\\BookFlightAmadeusJob' => $baseDir . '/app/Jobs/BookFlightAmadeusJob.php',
     'App\\Mail\\BookingConfirmation' => $baseDir . '/app/Mail/BookingConfirmation.php',
     'App\\Models\\Admin' => $baseDir . '/app/Models/Admin.php',
     'App\\Models\\Booking' => $baseDir . '/app/Models/Booking.php',

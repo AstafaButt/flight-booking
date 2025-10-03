@@ -23,32 +23,43 @@ class FlightController extends Controller
     }
 
     /**
-     * Search for flights using Amadeus API
+     * Search for flights using Amadeus API (cheapest flights)
      */
     public function search(Request $request)
     {
         $request->validate([
             'origin' => 'required|string|size:3',
             'destination' => 'required|string|size:3',
-            'date' => 'required|date',
+            'departure_date' => 'required|date',
+            'return_date' => 'nullable|date|after_or_equal:departure_date',
+            'adults' => 'nullable|integer|min:1|max:9',
         ]);
 
+        $origin = strtoupper($request->origin);
+        $destination = strtoupper($request->destination);
+        $departureDate = $request->departure_date;
+        $returnDate = $request->return_date ?? null;
+        $adults = $request->adults ?? 1;
+
         try {
-            $flights = $this->amadeus->searchFlights(
-                $request->origin,
-                $request->destination,
-                $request->date
+            // Get cheapest flights
+            $flights = $this->amadeus->searchCheapestFlights(
+                $origin,
+                $destination,
+                $departureDate,
+                $returnDate,
+                $adults
             );
 
-            if (isset($flights['error'])) {
+            if ($flights['error'] ?? false) {
                 return redirect()->route('flights.index')
-                    ->with('error', $flights['message']);
+                    ->with('error', $flights['message'] ?? 'Unable to fetch flights.');
             }
 
             // Save flight data in session for confirmation
             $request->session()->put('flight_data', $flights);
 
-            return view('flights.results', compact('flights'));
+            return view('flights.results', ['flights' => $flights]);
 
         } catch (\Exception $e) {
             \Log::error('Flight search failed: ' . $e->getMessage());
@@ -60,25 +71,24 @@ class FlightController extends Controller
     /**
      * Show flight confirmation page
      */
-   public function showConfirm(Request $request)
-{
-    $flightData = $request->session()->get('flight_data');
+    public function showConfirm(Request $request)
+    {
+        $flightData = $request->session()->get('flight_data');
 
-    if (!$flightData) {
-        return redirect()->route('flights.index')
-            ->with('error', 'No flight selected. Please search for flights again.');
+        if (!$flightData || empty($flightData['data'])) {
+            return redirect()->route('flights.index')
+                ->with('error', 'No flight selected. Please search for flights again.');
+        }
+
+        // Generate a one-time booking token
+        $bookingToken = session()->get('booking_token', bin2hex(random_bytes(16)));
+        $request->session()->put('booking_token', $bookingToken);
+
+        return view('flights.confirm', [
+            'flight' => $flightData,
+            'bookingToken' => $bookingToken
+        ]);
     }
-
-    // Generate a one-time booking token
-    $bookingToken = session()->get('booking_token', bin2hex(random_bytes(16)));
-    $request->session()->put('booking_token', $bookingToken);
-
-    return view('flights.confirm', [
-        'flight' => $flightData,
-        'bookingToken' => $bookingToken
-    ]);
-}
-
 
     /**
      * Confirm flight selection and store in session for booking
@@ -125,21 +135,9 @@ class FlightController extends Controller
         // Save passenger details in session
         $request->session()->put('passenger_details', $request->all());
 
-        // Generate a new booking token for BookingController to prevent duplicate submissions
+        // Generate a new booking token to prevent duplicate submissions
         $request->session()->put('booking_token', bin2hex(random_bytes(16)));
 
         return redirect()->route('payment.page');
     }
-    public function searchCheapest(Request $request)
-{
-    $origin = $request->input('origin');
-    $destination = $request->input('destination');
-    $departureDate = $request->input('departureDate');
-
-    $amadeus = new AmadeusService();
-    $results = $amadeus->searchCheapestDates($origin, $destination, $departureDate);
-
-    return view('results', ['cheapestFlights' => $results]);
-}
-
 }

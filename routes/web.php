@@ -75,7 +75,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->with('show_admin_modal', true);
     })->name('login');
 
-    // Admin Logout
+    // Admin Logoutss
     Route::post('/logout', function (Request $request) {
         $request->session()->forget('is_admin');
         $request->session()->invalidate();

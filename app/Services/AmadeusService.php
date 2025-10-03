@@ -54,7 +54,7 @@ class AmadeusService
     /**
      * Search flights via Amadeus API
      */
-    public function searchFlights(string $origin, string $destination, string $departureDate, int $adults = 1, string $currency = 'INR'): array
+    public function searchFlights(string $origin, string $destination, string $departureDate, int $adults = 1, string $currency = 'INR', string $returnDate = null): array
     {
         $token = $this->getAccessToken();
         if (!$token) {
@@ -62,15 +62,22 @@ class AmadeusService
         }
 
         try {
+            $params = [
+                'originLocationCode'      => $origin,
+                'destinationLocationCode' => $destination,
+                'departureDate'           => $departureDate,
+                'adults'                  => $adults,
+                'currencyCode'            => $currency,
+                'max'                     => 20, // adjust as needed
+            ];
+
+            if ($returnDate) {
+                $params['returnDate'] = $returnDate;
+            }
+
             $response = Http::withToken($token)
                 ->timeout(120)
-                ->get("{$this->baseUrl}/v2/shopping/flight-offers", [
-                    'originLocationCode' => $origin,
-                    'destinationLocationCode' => $destination,
-                    'departureDate' => $departureDate,
-                    'adults' => $adults,
-                    'currencyCode' => $currency,
-                ]);
+                ->get("{$this->baseUrl}/v2/shopping/flight-offers", $params);
 
             if ($response->failed()) {
                 Log::error('Amadeus flight search failed', [
@@ -80,7 +87,9 @@ class AmadeusService
                 return ['error' => true, 'message' => 'Unable to fetch flight offers at this time.'];
             }
 
-            return $response->json();
+            // Standardize response: always return 'data' array
+            $data = $response->json()['data'] ?? [];
+            return ['error' => false, 'data' => $data];
 
         } catch (\Exception $e) {
             Log::error('Amadeus flight search exception: ' . $e->getMessage());
@@ -90,10 +99,6 @@ class AmadeusService
 
     /**
      * Book a flight on Amadeus
-     *
-     * @param array $flightOffer Single flight offer from search
-     * @param array $passengerDetails Array of passenger details
-     * @return array|null Amadeus booking response or null if failed
      */
     public function bookFlight(array $flightOffer, array $passengerDetails): ?array
     {
@@ -132,30 +137,24 @@ class AmadeusService
         }
     }
 
-    public function searchCheapestDates(string $origin, string $destination, string $departureDate, string $returnDate = null): ?array
-{
-    try {
-        $token = $this->getAccessToken();
-        $endpoint = $this->baseUrl . "/v2/shopping/flight-offers";
-        
-        $query = [
-            'originLocationCode'      => $origin,
-            'destinationLocationCode' => $destination,
-            'departureDate'           => $departureDate, // format: YYYY-MM-DD
-            'adults'                  => 1,
-            'currencyCode'            => 'INR'
-        ];
+    /**
+     * Search cheapest flights by date range (or single day)
+     */
+    public function searchCheapestFlights(string $origin, string $destination, string $departureDate, string $returnDate = null, int $adults = 1, string $currency = 'INR'): array
+    {
+        // Use searchFlights internally
+        $result = $this->searchFlights($origin, $destination, $departureDate, $adults, $currency, $returnDate);
 
-        if ($returnDate) {
-            $query['returnDate'] = $returnDate;
+        if (isset($result['error']) && $result['error']) {
+            return $result;
         }
 
-        $response = Http::withToken($token)->get($endpoint, $query);
-        return $response->json();
-    } catch (\Exception $e) {
-        \Log::error("Amadeus cheapest date search failed: " . $e->getMessage());
-        return null;
-    }
-}
+        // Sort by price ascending
+        $data = $result['data'] ?? [];
+        usort($data, function ($a, $b) {
+            return floatval($a['price']['total']) <=> floatval($b['price']['total']);
+        });
 
+        return ['error' => false, 'data' => $data];
+    }
 }

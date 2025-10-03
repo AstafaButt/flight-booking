@@ -854,6 +854,7 @@ class ComposerStaticInitc514d8f7b9fc5970bdd94287905ef584
         'App\\Http\\Controllers\\PaymentController' => __DIR__ . '/../..' . '/app/Http/Controllers/PaymentController.php',
         'App\\Http\\Middleware\\AdminAuth' => __DIR__ . '/../..' . '/app/Http/Middleware/AdminAuth.php',
         'App\\Http\\Middleware\\NoBackButton' => __DIR__ . '/../..' . '/app/Http/Middleware/NoBackButton.php',
+        'App\\Jobs\\BookFlightAmadeusJob' => __DIR__ . '/../..' . '/app/Jobs/BookFlightAmadeusJob.php',
         'App\\Mail\\BookingConfirmation' => __DIR__ . '/../..' . '/app/Mail/BookingConfirmation.php',
         'App\\Models\\Admin' => __DIR__ . '/../..' . '/app/Models/Admin.php',
         'App\\Models\\Booking' => __DIR__ . '/../..' . '/app/Models/Booking.php',
